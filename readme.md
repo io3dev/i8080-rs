@@ -10,46 +10,30 @@ uses the log crate for CPU info about the opcode execution and cpu errors
 ## Usage
 
 ```rust
+use std::io::Read;
 use i8080_rs::{
     cpu::Cpu,
     bus::Bus,
-}
+};
 
 fn main() {
-    let program = [
-        0x76 // HLT
-    ];
+    let memory = [0; 0x10000];
+    let bus = Bus::new(memory.to_vec());
+    let args: Vec<String> = std::env::args().collect();
+  
+    let mut file = std::fs::File::open(&args[1]).unwrap();
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).unwrap();
+    let mut cpu = Cpu::init(0x100, &buf, bus);
 
-    let mut new_cpu = Cpu::init(0x0, &program);
-
-    loop {
-        new_cpu.cycle();
-    }
-}
-```
-
-TST8080 Test
-
-```rust
-use i8080_rs::{
-    cpu::Cpu,
-    bus::Bus,
-}
-
-fn main() {
-    let tst8080 = std::fs::Open("TST8080.COM");
-
-
-    let mut new_cpu = Cpu::init(0x100, &tst8080);
+    cpu.regs.pc = 0x100;
 
     loop {
-        new_cpu.cycle();
+        if !cpu.hlted {
+            cpu.cycle();
+        }
     }
+    
 }
 
 ```
-
-TODO
-
-- DAA
-
