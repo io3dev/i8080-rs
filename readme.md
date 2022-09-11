@@ -37,3 +37,14 @@ fn main() {
 }
 
 ```
+
+Configure IO
+
+```rust
+cpu.set_io(|port: u8| {
+    Ok(0xff)
+}, |port: u8, value: u8| {
+    println!("Out Values, Port: 0x{:X}, Value: 0x{:X}", port, value)
+    Ok(())
+});
+```
