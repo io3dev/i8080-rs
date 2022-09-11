@@ -9,7 +9,7 @@ use i8080_rs::{
 
 
 fn main() {
-    // simple_log::file("cpu.log", "debug", 100, 10).unwrap();
+    simple_log::file("logs/cpu.log", "debug", 100, 10).unwrap();
     // simple_log::quick!("debug");
     let memory = [0; 0x10000];
     let bus = Bus::new(memory.to_vec());
@@ -17,15 +17,15 @@ fn main() {
     
     let mut file = std::fs::File::open(&args[1]).unwrap();
     let mut buf = Vec::new();
-    file.read_to_end(&mut buf);
+    file.read_to_end(&mut buf).unwrap();
     let mut cpu = Cpu::init(0x100, &buf, bus);
     cpu.io_in = Box::new(|port: u8| {
         Ok(2)
     });
 
-    cpu.io_out = Box::new(|port: u8, value: u8| {
-        Ok(())
-    });
+    // cpu.set_io(|port: u8| {
+    //     Ok(2)
+    // });
     cpu.regs.pc = 0x100;
     // cpu.
     loop {

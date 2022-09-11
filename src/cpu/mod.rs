@@ -1,5 +1,6 @@
 use crate::bus::Bus;
 
+
 use std::{
     mem,
     env,
@@ -127,7 +128,7 @@ pub struct Cpu {
     pub io_in: Box<dyn Fn(u8) -> Result<u8, ()>>,
     pub io_out: Box<dyn Fn(u8, u8) -> Result<(), ()>>,
 
-    bus: Bus,
+    pub bus: Bus,
 
     pub output: String,
 }
@@ -228,6 +229,11 @@ impl Cpu {
 
     }
 
+
+    pub fn set_io(&mut self, input: fn(u8) -> Result<u8, ()>, output: fn(u8, u8) -> Result<(), ()>) {
+        self.io_in = Box::new(input);
+        self.io_out = Box::new(output);
+    }
     // Cycle the cpu once
 
     pub fn cycle(&mut self) {
@@ -239,16 +245,20 @@ impl Cpu {
         self.immediate = [self.bus.read((self.regs.pc + 1) as usize), self.bus.read((self.regs.pc + 2) as usize)];
         // println!("{}", advance);
         // self.cycles_count += (1 + CYCLES[opcode as usize]) as usize;
-        // debug!("Opcode: {}, ({}, {}), PC (0x{:X}),   SP: {}", mnemnoics[opcode as usize], self.immediate[0], self.immediate[1], self.regs.pc, self.regs.sp);
+        debug!("Opcode: {}, ({}, {}), PC (0x{:X}),   SP: {}", mnemnoics[opcode as usize], self.immediate[0], self.immediate[1], self.regs.pc, self.regs.sp);
         self.cycles_count += 1;
         match opcode {
 
-            0x00 | 0x20 => {}
+            0x00 | 0x20 | 0x28 | 0x38 | 0x30 | 0x08 | 0xD9 => {}
 
             /*
             DATA TRANSFER INSTRUCTIONS
             */
-
+            
+            0xE3 => {
+                self.regs.l = self.bus.read(self.regs.sp as usize);
+                self.regs.h = self.bus.read((self.regs.sp + 1) as usize);
+            }
 
             // MOV INSTRUCTIONS
             0x40 => {},
@@ -655,20 +665,22 @@ impl Cpu {
                 self.flags.carry = (1 == (x&1));
             }
 
+            0x07 => {
+                let x: u8 = self.regs.a;
+                self.regs.a = ((x & 1) << 7) | (x >> 1);
+                self.flags.carry = (1 == (x&1));
+            }
+
             /*
             IO Instructions 
             */
             0xDB => {
                 // self.io.cpu_read(self.immediate[0]);
-                debug!("Read IO port");
+                self.regs.a = (self.io_in)(self.immediate[0]).unwrap();
                 advance = 2;
             }
             0xD3 => {
-                // todo!();
-                // (self.in_routine)(4);
-                // self.io.
-                // self.io.cpu_write(self.immediate[0], self.regs.a);
-                // self.i
+                (self.io_out)(self.regs.a, self.immediate[0]);
                 advance = 2},
             0xFB => {
                 // log::info!("Interupts Enabled");
@@ -692,12 +704,19 @@ impl Cpu {
                 self.hlted = true;
             },
 
+            0xF9 => {
+                self.regs.sp = self.cmb_le(self.regs.h, self.regs.l);
+            }
+            // RLC0
+            0xF3 => {
+                self.interupts_enabled = false;
+            }
             
             
 
             // _ => unimplemented!("Opcode 0x{:X}", self.memory[self.regs.pc as usize]),
             _ => {
-                log::error!("Unkown Opcode: {}", mnemnoics[opcode as usize]);
+                log::error!("Unkown Opcode: {}, 0x{:X}", mnemnoics[opcode as usize], opcode);
                 self.hlted = true;
             }
             // _ => unimplemented!(),
@@ -1103,7 +1122,41 @@ impl Cpu {
 
 #[cfg(test)]
 mod cpu_test {
-    // use super::*;
+    use super::*;
+
+
+    #[test]
+    fn io() {
+        let mut porta = 0;
+        let memory = [0; 0x1000];
+        let bus = Bus::new(memory.to_vec());
+        let mut cpu = Cpu::init(0x0, &[0x3E, 0x10, 0xD3,0x45, 0xdb, 0xff], bus);
+        // cpu.io_out = Box::new(|port: u8, value: u8| {
+
+        //     assert_eq!(value, 0x45);
+        //     assert_eq!(port, 0x10);
+
+        //     Ok(())
+        // });
+
+        cpu.set_io(|port: u8| {
+            Ok(0xff)
+        }, |port: u8, value: u8| {
+            assert_eq!(value, 0x45);
+            assert_eq!(port, 0x10);
+            Ok(())
+        });
+
+        cpu.cycle();
+        cpu.cycle();
+
+        // cpu.io_in = Box::new(|port: u8| {
+        //     Ok(0xff)
+        // });
+
+        cpu.cycle();
+        assert_eq!(cpu.regs.a, 0xff);
+    }
     // #[allow(warnings)]
     // #[test]
     // fn lxi_bc() {
